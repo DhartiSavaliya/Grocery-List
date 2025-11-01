@@ -13,21 +13,43 @@
  */
 import SwiftUI
 import SwiftData
+import TipKit
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var items: [Item]
+    @State private var item: String = ""
+    @FocusState private var isFocused: Bool
+    
+    //-------------for tip-----------------------
+    let buttonTip = ButtonTip()
+    
+    init() {
+        setupTips()
+    }
+    func setupTips() {
+        do {
+            try Tips.resetDatastore()
+            try Tips.configure([
+                .displayFrequency(.immediate)
+            ])
+             Tips.showAllTipsForTesting()
+        }catch {
+            print("Error Initializing TipKit \(error.localizedDescription)")
+        }
+    }
     
     func addEssantialFoods(){
-        modelContext.insert(Item(title: "Backery", isCompleted: false))
-        modelContext.insert(Item(title: "Beans", isCompleted: true))
-        modelContext.insert(Item(title: "Sugar", isCompleted: .random()))
-        modelContext.insert(Item(title: "Veggies", isCompleted: .random()))
-        modelContext.insert(Item(title: "Milk and Butter", isCompleted: .random()))
+//        modelContext.insert(Item(title: "Backery", isCompleted: false))
+//        modelContext.insert(Item(title: "Beans", isCompleted: true))
+//        modelContext.insert(Item(title: "Sugar", isCompleted: .random()))
+//        modelContext.insert(Item(title: "Veggies", isCompleted: .random()))
+//        modelContext.insert(Item(title: "Milk and Butter", isCompleted: .random()))
     }
     
     var body: some View {
             NavigationStack {
+    //------------------------ created item list
                 List {
                     ForEach(items) { item in
                         Text(item.title)
@@ -35,28 +57,84 @@ struct ContentView: View {
                             .padding(.vertical, 2)
                             .foregroundStyle(item.isCompleted == false ? Color.primary : Color.accentColor)
                             .strikethrough(item.isCompleted)
+                        //---------swipe Actions-------------
+                            .swipeActions{
+                                Button(role: .destructive){
+                                    withAnimation{
+                                        modelContext.delete(item)
+                                    }
+                                }label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
+                            .swipeActions(edge: .leading){
+                                Button("", systemImage: item.isCompleted == false ? "checkmark.circle": "x.circle"){
+                
+                                item.isCompleted.toggle()
+                                    }.tint(item.isCompleted == false ? .green : .accentColor)
+                            }
                     }
                 }
                 .navigationTitle("Grocery List")
+                //--------Toolbar items
                 .toolbar {
                     if items.isEmpty {
                         ToolbarItem(placement: .topBarTrailing) {
                             Button {
                                addEssantialFoods()
                             }label: {
-                                Label("Essentials", systemImage: "carrot")
+                                Image(systemName: "carrot")
                             }
+                            .popoverTip(buttonTip)
                         }
                     }
                 }
+                //--------Empty list screen----------------
                 .overlay{
                     if items.isEmpty {
                         ContentUnavailableView("Empty Cart", systemImage: "cart.circle", description: Text("Add some items to the shopping list."))
                     }
                 }
+                
+                //------------Textfield plus save data button -------------
+                .safeAreaInset(edge: .bottom){
+                    VStack(spacing: 12) {
+                        TextField("",text: $item)
+                            .textFieldStyle(.plain)
+                            .padding(12)
+                            .background(.tertiary)
+                            .cornerRadius(12)
+                            .font(.title.weight(.light))
+                            .focused($isFocused)
+                        Button {
+                            guard !item.isEmpty else {
+                                return
+                            }
+                           let newItem = Item(title: item, isCompleted: false)
+                            modelContext.insert(newItem)
+                            item = ""
+                            isFocused = false
+                            
+                        } label:{
+                            Text("Save")
+                                .font(.title2.weight(.bold))
+                                .frame(maxWidth: .infinity)
+                            }
+                        .buttonStyle(.borderedProminent)
+                        .buttonBorderShape(.roundedRectangle)
+                        .controlSize(.extraLarge)
+                        }.padding()
+                        .background(.bar)
+                    
+                    
+                    
+                }
+                
             }
         }
 }
+
+//-----------------------Preview----------------------------------------//
 
 #Preview("Sample Data") {
     let sampleData: [Item] = [
